@@ -7,7 +7,7 @@ if (isset($_POST['fullname'])) {
     $phone = ($_POST['phone']);
 
     $newUser = "insert into users (fullname, email, phone, profile_picture, created_at) values ('$fullname', '$email', '$phone', '', now())";
-    save_user_with_profile($newUser);
+    save($newUser, 'users');
     redirect_to("users.php");
 }
 

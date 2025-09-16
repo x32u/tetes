@@ -9,7 +9,7 @@ if (isset($_POST['name'])) {
 
     $newProduct = "insert into products (name, price, category, stock_quantity, created_at) 
   values ('$name', '$price', '$category', '$stock_quantity', now())";
-    save($newProduct);
+    save($newProduct, 'products');
     redirect_to("products.php");
 }
 

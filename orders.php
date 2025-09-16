@@ -15,7 +15,7 @@ if (isset($_POST['user_id'])) {
 
     $newOrder = "insert into orders (user_id, product_id, quantity, total_amount, created_at) 
   values ('$user_id', '$product_id', '$quantity', '$total_amount', now())";
-    save($newOrder);
+    save($newOrder, 'orders');
     redirect_to("orders.php");
 }
 

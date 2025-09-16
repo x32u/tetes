@@ -25,23 +25,46 @@ function confirm_query($restul_set)
     }
 }
 
-//version 2
-function save($insertQuery)
+//version 3
+function save($insertQuery, $table)
 {
     global $connection;
     $sql = mysqli_query($connection, $insertQuery) or die(mysqli_error($connection));
     $pid = mysqli_insert_id($connection);
-    $newname = "$pid.jpg";
-
+    $newname = "$table$pid.jpg";
+    
+    // Determine upload directory based on table
+    $uploadDir = "";
+    if ($table == "products") {
+        $uploadDir = "uploads/products/";
+    } elseif ($table == "users") {
+        $uploadDir = "uploads/profiles/";
+    } else {
+        $uploadDir = "uploads/$table/";
+    }
+    
     // Handle file upload
     if (isset($_FILES['fileField']) && $_FILES['fileField']['error'] == 0) {
-        if (move_uploaded_file($_FILES['fileField']['tmp_name'], "uploads/products/$newname")) {
-            // Update the product record with the image filename
-            $updateQuery = "UPDATE products SET image = '$newname' WHERE id = '$pid'";
+        // Create directory if it doesn't exist
+        if (!file_exists($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        if (move_uploaded_file($_FILES['fileField']['tmp_name'], $uploadDir . $newname)) {
+            // Update the record with the image filename based on table type
+            if ($table == "products") {
+                $updateQuery = "UPDATE products SET image = '$newname' WHERE id = '$pid'";
+            } elseif ($table == "users") {
+                $updateQuery = "UPDATE users SET profile_picture = '$newname' WHERE id = '$pid'";
+            } else {
+                // Generic update for other tables
+                $updateQuery = "UPDATE $table SET image = '$newname' WHERE id = '$pid'";
+            }
             mysqli_query($connection, $updateQuery);
         }
     }
     confirm_query($sql);
+    mysqli_close($connection);
 }
 
 //version for users with profile pictures
@@ -61,6 +84,88 @@ function save_user_with_profile($insertQuery)
         }
     }
     confirm_query($sql);
+}
+
+//version 3 - Save two related entities
+function save_two_entities($insertQuery1, $table1, $insertQuery2, $table2, $relationField = null)
+{
+    global $connection;
+    
+    // Start transaction to ensure both inserts succeed or both fail
+    mysqli_autocommit($connection, false);
+    
+    try {
+        // Insert first entity
+        $sql1 = mysqli_query($connection, $insertQuery1);
+        if (!$sql1) throw new Exception(mysqli_error($connection));
+        $pid1 = mysqli_insert_id($connection);
+        
+        // If second query needs the first entity's ID, replace placeholder
+        if ($relationField && strpos($insertQuery2, "{{RELATION_ID}}") !== false) {
+            $insertQuery2 = str_replace("{{RELATION_ID}}", $pid1, $insertQuery2);
+        }
+        
+        // Insert second entity
+        $sql2 = mysqli_query($connection, $insertQuery2);
+        if (!$sql2) throw new Exception(mysqli_error($connection));
+        $pid2 = mysqli_insert_id($connection);
+        
+        // Handle file uploads for first entity
+        $newname1 = "$table1$pid1.jpg";
+        $uploadDir1 = ($table1 == "products") ? "uploads/products/" : 
+                     (($table1 == "users") ? "uploads/profiles/" : "uploads/$table1/");
+        
+        if (isset($_FILES['fileField']) && $_FILES['fileField']['error'] == 0) {
+            if (!file_exists($uploadDir1)) {
+                mkdir($uploadDir1, 0755, true);
+            }
+            
+            if (move_uploaded_file($_FILES['fileField']['tmp_name'], $uploadDir1 . $newname1)) {
+                if ($table1 == "products") {
+                    $updateQuery1 = "UPDATE products SET image = '$newname1' WHERE id = '$pid1'";
+                } elseif ($table1 == "users") {
+                    $updateQuery1 = "UPDATE users SET profile_picture = '$newname1' WHERE id = '$pid1'";
+                } else {
+                    $updateQuery1 = "UPDATE $table1 SET image = '$newname1' WHERE id = '$pid1'";
+                }
+                mysqli_query($connection, $updateQuery1);
+            }
+        }
+        
+        // Handle file uploads for second entity (if separate field exists)
+        if (isset($_FILES['fileField2']) && $_FILES['fileField2']['error'] == 0) {
+            $newname2 = "$table2$pid2.jpg";
+            $uploadDir2 = ($table2 == "products") ? "uploads/products/" : 
+                         (($table2 == "users") ? "uploads/profiles/" : "uploads/$table2/");
+            
+            if (!file_exists($uploadDir2)) {
+                mkdir($uploadDir2, 0755, true);
+            }
+            
+            if (move_uploaded_file($_FILES['fileField2']['tmp_name'], $uploadDir2 . $newname2)) {
+                if ($table2 == "products") {
+                    $updateQuery2 = "UPDATE products SET image = '$newname2' WHERE id = '$pid2'";
+                } elseif ($table2 == "users") {
+                    $updateQuery2 = "UPDATE users SET profile_picture = '$newname2' WHERE id = '$pid2'";
+                } else {
+                    $updateQuery2 = "UPDATE $table2 SET image = '$newname2' WHERE id = '$pid2'";
+                }
+                mysqli_query($connection, $updateQuery2);
+            }
+        }
+        
+        // Commit transaction
+        mysqli_commit($connection);
+        mysqli_autocommit($connection, true);
+        
+        return array('id1' => $pid1, 'id2' => $pid2);
+        
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        mysqli_rollback($connection);
+        mysqli_autocommit($connection, true);
+        die("Transaction failed: " . $e->getMessage());
+    }
 }
 
 function display_all($sql, $table_type, $url = null)
