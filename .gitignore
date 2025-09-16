@@ -1,0 +1,21 @@
+# Uploaded files
+uploads/
+*.jpg
+*.png
+*.gif
+*.jpeg
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
