@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Entity Upload Form</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .form-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea, select { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 3px; }
+        button { background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .success { color: green; background: #e8f5e8; padding: 10px; border-radius: 3px; }
+        .error { color: red; background: #ffeaea; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Multi-Entity Database Save Example</h1>
+    
+    <?php
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        require_once '../src/config.php';
+        require_once '../src/DatabaseHandler.php';
+        
+        $handler = new DatabaseHandler($connection);
+        
+        if (isset($_POST['save_type'])) {
+            if ($_POST['save_type'] === 'single') {
+                // Single entity save
+                $name = mysqli_real_escape_string($connection, $_POST['product_name']);
+                $description = mysqli_real_escape_string($connection, $_POST['product_description']);
+                $price = floatval($_POST['product_price']);
+                
+                $query = "INSERT INTO products (name, description, price) VALUES ('$name', '$description', $price)";
+                $result = $handler->save($query, 'products', 'fileField', '../inventory_images/');
+                
+                if ($result['success']) {
+                    echo "<div class='success'>Product saved successfully! ID: " . $result['id'] . "</div>";
+                } else {
+                    echo "<div class='error'>Error: " . $result['error'] . "</div>";
+                }
+                
+            } elseif ($_POST['save_type'] === 'double') {
+                // Two entities save
+                $username = mysqli_real_escape_string($connection, $_POST['username']);
+                $email = mysqli_real_escape_string($connection, $_POST['email']);
+                $firstName = mysqli_real_escape_string($connection, $_POST['first_name']);
+                $lastName = mysqli_real_escape_string($connection, $_POST['last_name']);
+                
+                $userQuery = "INSERT INTO users (username, email) VALUES ('$username', '$email')";
+                $profileQuery = "INSERT INTO user_profiles (user_id, first_name, last_name) VALUES ({FIRST_ID}, '$firstName', '$lastName')";
+                
+                $options = [
+                    'firstFileField' => 'avatar',
+                    'secondFileField' => 'background',
+                    'uploadDir' => '../inventory_images/',
+                    'allowedTypes' => ['jpg', 'jpeg', 'png', 'gif']
+                ];
+                
+                $result = $handler->saveTwoEntities($userQuery, 'users', $profileQuery, 'user_profiles', $options);
+                
+                if ($result['success']) {
+                    echo "<div class='success'>User and profile saved successfully!<br>";
+                    echo "User ID: " . $result['firstEntity']['id'] . "<br>";
+                    echo "Profile ID: " . $result['secondEntity']['id'] . "</div>";
+                } else {
+                    echo "<div class='error'>Error: " . $result['error'] . "</div>";
+                }
+            }
+        }
+        
+        $handler->closeConnection();
+    }
+    ?>
+    
+    <div class="form-section">
+        <h2>Single Entity Save (Original Function Style)</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="save_type" value="single">
+            
+            <div class="form-group">
+                <label for="product_name">Product Name:</label>
+                <input type="text" id="product_name" name="product_name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="product_description">Description:</label>
+                <textarea id="product_description" name="product_description" rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="product_price">Price:</label>
+                <input type="number" id="product_price" name="product_price" step="0.01" min="0" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="fileField">Product Image:</label>
+                <input type="file" id="fileField" name="fileField" accept="image/*">
+            </div>
+            
+            <button type="submit">Save Product</button>
+        </form>
+    </div>
+    
+    <div class="form-section">
+        <h2>Two Entities Save (User + Profile)</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="save_type" value="double">
+            
+            <h3>User Information</h3>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="avatar">Avatar Image:</label>
+                <input type="file" id="avatar" name="avatar" accept="image/*">
+            </div>
+            
+            <h3>Profile Information</h3>
+            <div class="form-group">
+                <label for="first_name">First Name:</label>
+                <input type="text" id="first_name" name="first_name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="last_name">Last Name:</label>
+                <input type="text" id="last_name" name="last_name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="background">Background Image:</label>
+                <input type="file" id="background" name="background" accept="image/*">
+            </div>
+            
+            <button type="submit">Save User & Profile</button>
+        </form>
+    </div>
+    
+    <div class="form-section">
+        <h2>Database Schema</h2>
+        <p>To use this example, create these tables in your database:</p>
+        <pre><code>-- Products table (for single entity example)
+CREATE TABLE products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users table (for two entities example)
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User profiles table (for two entities example)
+CREATE TABLE user_profiles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);</code></pre>
+    </div>
+</body>
+</html>
